@@ -5,10 +5,9 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-// --- Marshal/Unmarshal Options ---
 var (
 	protojsonMarshalOptions = &protojson.MarshalOptions{
-		UseProtoNames:   false, // Use camelCase
+		UseProtoNames:   false,
 		EmitUnpopulated: false,
 	}
 	protojsonUnmarshalOptions = &protojson.UnmarshalOptions{
@@ -16,66 +15,95 @@ var (
 	}
 )
 
+// --- BUILD CACHE RESPONSE ---
+
+type BuildCacheResponse struct {
+	GeminiCacheId string `json:"geminiCacheId"`
+}
+
+func (pk BuildCacheResponse) MarshalJSON() ([]byte, error) {
+	protoPb := &builderv1.BuildCacheResponsePb{GeminiCacheId: pk.GeminiCacheId}
+	return protojsonMarshalOptions.Marshal(protoPb)
+}
+
+func (pk *BuildCacheResponse) UnmarshalJSON(data []byte) error {
+	var protoPb builderv1.BuildCacheResponsePb
+	if err := protojsonUnmarshalOptions.Unmarshal(data, &protoPb); err != nil {
+		return err
+	}
+	pk.GeminiCacheId = protoPb.GeminiCacheId
+	return nil
+}
+
+// --- BUILD CACHE REQUEST ---
+
 type Attachment struct {
+	ID        string `json:"id"`
 	CacheID   string `json:"cacheId"`
-	ProfileID string `json:"profileId,omitempty"` // Optional filter profile
+	ProfileID string `json:"profileId,omitempty"`
 }
 
 type BuildCacheRequest struct {
+	SessionID   string       `json:"sessionId"`
 	Model       string       `json:"model"`
 	Attachments []Attachment `json:"attachments"`
 }
 
-// ToProto converts the idiomatic Go struct into its Protobuf representation.
-func ToProto(native *BuildCacheRequest) *builderv1.BuildCacheRequestPb {
+func CacheRequestToProto(native *BuildCacheRequest) *builderv1.BuildCacheRequestPb {
 	if native == nil {
 		return nil
 	}
-	return &builderv1.BuildCacheRequestPb{}
-}
 
-// FromProto converts the Protobuf representation into the idiomatic Go struct.
-func FromProto(proto *builderv1.BuildCacheRequestPb) (*BuildCacheRequest, error) {
-	if proto == nil {
-		return nil, nil
+	// FIX: Pre-allocate capacity, but start length at 0, then append correctly.
+	attachments := make([]*builderv1.NetworkAttachmentPb, 0, len(native.Attachments))
+
+	for _, m := range native.Attachments {
+		pbAtt := &builderv1.NetworkAttachmentPb{
+			Id:      m.ID,
+			CacheId: m.CacheID,
+		}
+		if m.ProfileID != "" {
+			pid := m.ProfileID // Need a local variable to take the pointer
+			pbAtt.ProfileId = &pid
+		}
+		attachments = append(attachments, pbAtt)
 	}
-	return &BuildCacheRequest{}, nil
+
+	return &builderv1.BuildCacheRequestPb{
+		SessionId:   native.SessionID,
+		Model:       native.Model,
+		Attachments: attachments,
+	}
 }
 
-// --- JSON METHODS ---
-
-// MarshalJSON implements the json.Marshaler interface.
 func (pk BuildCacheRequest) MarshalJSON() ([]byte, error) {
-	// 1. Convert native Go struct to Protobuf struct
-	// Note: We pass a pointer to ToProto
-	protoPb := ToProto(&pk)
-
-	// 2. Marshal using our camelCase options
-	return protojsonMarshalOptions.Marshal(protoPb)
+	return protojsonMarshalOptions.Marshal(CacheRequestToProto(&pk))
 }
 
-// UnmarshalJSON implements the json.Unmarshaler interface.
-// This remains a POINTER RECEIVER (*pk), which is correct
-// because it needs to modify the struct it's called on.
 func (pk *BuildCacheRequest) UnmarshalJSON(data []byte) error {
 	var protoPb builderv1.BuildCacheRequestPb
-
 	if err := protojsonUnmarshalOptions.Unmarshal(data, &protoPb); err != nil {
 		return err
 	}
 
-	native, err := FromProto(&protoPb)
-	if err != nil {
-		return err
-	}
+	pk.SessionID = protoPb.SessionId
+	pk.Model = protoPb.Model
 
-	if native != nil {
-		*pk = *native
-	} else {
-		*pk = BuildCacheRequest{}
+	pk.Attachments = make([]Attachment, 0, len(protoPb.Attachments))
+	for _, a := range protoPb.Attachments {
+		att := Attachment{
+			ID:      a.Id,
+			CacheID: a.CacheId,
+		}
+		if a.ProfileId != nil {
+			att.ProfileID = *a.ProfileId
+		}
+		pk.Attachments = append(pk.Attachments, att)
 	}
 	return nil
 }
+
+// --- GENERATE STREAM REQUEST ---
 
 type Message struct {
 	ID        string `json:"id"`
@@ -96,38 +124,63 @@ func ToStreamProto(native *GenerateStreamRequest) *builderv1.GenerateStreamReque
 	if native == nil {
 		return nil
 	}
-	return &builderv1.GenerateStreamRequestPb{}
-}
 
-func FromStreamProto(proto *builderv1.GenerateStreamRequestPb) (*GenerateStreamRequest, error) {
-	if proto == nil {
-		return nil, nil
+	history := make([]*builderv1.NetworkMessagePb, 0, len(native.History))
+	for _, m := range native.History {
+		history = append(history, &builderv1.NetworkMessagePb{
+			Id:        m.ID,
+			Role:      m.Role,
+			Content:   m.Content,
+			Timestamp: m.Timestamp,
+		})
 	}
-	return &GenerateStreamRequest{}, nil
+
+	inlines := make([]*builderv1.NetworkAttachmentPb, 0, len(native.InlineAttachments))
+	for _, a := range native.InlineAttachments {
+		pbAtt := &builderv1.NetworkAttachmentPb{
+			Id:      a.ID,
+			CacheId: a.CacheID,
+		}
+		if a.ProfileID != "" {
+			pid := a.ProfileID
+			pbAtt.ProfileId = &pid
+		}
+		inlines = append(inlines, pbAtt)
+	}
+
+	pb := &builderv1.GenerateStreamRequestPb{
+		SessionId:         native.SessionID,
+		Model:             native.Model,
+		History:           history,
+		InlineAttachments: inlines,
+	}
+
+	if native.GeminiCacheID != "" {
+		cid := native.GeminiCacheID
+		pb.GeminiCacheId = &cid
+	}
+
+	return pb
 }
 
-// MarshalJSON implements json.Marshaler
 func (pk GenerateStreamRequest) MarshalJSON() ([]byte, error) {
-	protoPb := ToStreamProto(&pk)
-	return protojsonMarshalOptions.Marshal(protoPb)
+	return protojsonMarshalOptions.Marshal(ToStreamProto(&pk))
 }
 
-// UnmarshalJSON implements json.Unmarshaler
 func (pk *GenerateStreamRequest) UnmarshalJSON(data []byte) error {
 	var protoPb builderv1.GenerateStreamRequestPb
-
 	if err := protojsonUnmarshalOptions.Unmarshal(data, &protoPb); err != nil {
 		return err
 	}
 
-	// Because your FromStreamProto is currently a stub, we map fields manually for now
-	// until you write out the full struct-to-struct mapping.
 	pk.SessionID = protoPb.SessionId
 	pk.Model = protoPb.Model
+
 	if protoPb.GeminiCacheId != nil {
 		pk.GeminiCacheID = *protoPb.GeminiCacheId
 	}
 
+	pk.History = make([]Message, 0, len(protoPb.History))
 	for _, m := range protoPb.History {
 		pk.History = append(pk.History, Message{
 			ID:        m.Id,
@@ -137,8 +190,10 @@ func (pk *GenerateStreamRequest) UnmarshalJSON(data []byte) error {
 		})
 	}
 
+	pk.InlineAttachments = make([]Attachment, 0, len(protoPb.InlineAttachments))
 	for _, a := range protoPb.InlineAttachments {
 		att := Attachment{
+			ID:      a.Id,
 			CacheID: a.CacheId,
 		}
 		if a.ProfileId != nil {
