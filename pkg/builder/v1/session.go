@@ -19,12 +19,13 @@ type FileState struct {
 	IsDeleted bool   `json:"isDeleted" firestore:"isDeleted"`
 }
 
-// ChangeProposal now represents a document in the Global Diff Registry
+// ChangeProposal represents a document in the Global Diff Registry
 type ChangeProposal struct {
-	ID         string         `json:"id" firestore:"-"`                // Stored as Firestore Doc ID
-	SessionID  string         `json:"sessionId" firestore:"sessionId"` // NEW: Ties proposal to the chat session
+	ID         string         `json:"id" firestore:"-"`
+	SessionID  string         `json:"sessionId" firestore:"sessionId"`
 	FilePath   string         `json:"filePath" firestore:"filePath"`
-	NewContent string         `json:"newContent" firestore:"newContent"`
+	Patch      string         `json:"patch,omitempty" firestore:"patch,omitempty"`           // NEW
+	NewContent string         `json:"newContent,omitempty" firestore:"newContent,omitempty"` // UPDATED
 	Reasoning  string         `json:"reasoning" firestore:"reasoning"`
 	Status     ProposalStatus `json:"status" firestore:"status"`
 	CreatedAt  time.Time      `json:"createdAt" firestore:"createdAt"`
@@ -75,15 +76,24 @@ func ChangeProposalToProto(native *ChangeProposal) *builderv1.ChangeProposalPb {
 	if native == nil {
 		return nil
 	}
-	return &builderv1.ChangeProposalPb{
-		Id:         native.ID,
-		SessionId:  native.SessionID,
-		FilePath:   native.FilePath,
-		NewContent: native.NewContent,
-		Reasoning:  native.Reasoning,
-		Status:     string(native.Status),
-		CreatedAt:  native.CreatedAt.Format(time.RFC3339),
+
+	pb := &builderv1.ChangeProposalPb{
+		Id:        native.ID,
+		SessionId: native.SessionID,
+		FilePath:  native.FilePath,
+		Reasoning: native.Reasoning,
+		Status:    string(native.Status),
+		CreatedAt: native.CreatedAt.Format(time.RFC3339),
 	}
+
+	if native.Patch != "" {
+		pb.Patch = &native.Patch
+	}
+	if native.NewContent != "" {
+		pb.NewContent = &native.NewContent
+	}
+
+	return pb
 }
 
 func (p ChangeProposal) MarshalJSON() ([]byte, error) {
@@ -99,10 +109,16 @@ func (p *ChangeProposal) UnmarshalJSON(data []byte) error {
 	p.ID = pb.Id
 	p.SessionID = pb.SessionId
 	p.FilePath = pb.FilePath
-	p.NewContent = pb.NewContent
 	p.Reasoning = pb.Reasoning
 	p.Status = ProposalStatus(pb.Status)
 	p.CreatedAt, _ = time.Parse(time.RFC3339, pb.CreatedAt)
+
+	if pb.Patch != nil {
+		p.Patch = *pb.Patch
+	}
+	if pb.NewContent != nil {
+		p.NewContent = *pb.NewContent
+	}
 
 	return nil
 }
