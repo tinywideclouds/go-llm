@@ -19,8 +19,10 @@ type FileState struct {
 	IsDeleted bool   `json:"isDeleted" firestore:"isDeleted"`
 }
 
+// ChangeProposal now represents a document in the Global Diff Registry
 type ChangeProposal struct {
-	ID         string         `json:"id" firestore:"id"`
+	ID         string         `json:"id" firestore:"-"`                // Stored as Firestore Doc ID
+	SessionID  string         `json:"sessionId" firestore:"sessionId"` // NEW: Ties proposal to the chat session
 	FilePath   string         `json:"filePath" firestore:"filePath"`
 	NewContent string         `json:"newContent" firestore:"newContent"`
 	Reasoning  string         `json:"reasoning" firestore:"reasoning"`
@@ -29,50 +31,27 @@ type ChangeProposal struct {
 }
 
 type Session struct {
-	ID               string                    `json:"id" firestore:"-"`
-	CompiledCacheID  string                    `json:"compiledCacheId" firestore:"compiledCacheId"`
-	AcceptedOverlays map[string]FileState      `json:"acceptedOverlays" firestore:"acceptedOverlays"`
-	PendingProposals map[string]ChangeProposal `json:"pendingProposals" firestore:"pendingProposals"`
-	UpdatedAt        time.Time                 `json:"updatedAt" firestore:"updatedAt"`
+	ID              string    `json:"id" firestore:"-"`
+	CompiledCacheID string    `json:"compiledCacheId" firestore:"compiledCacheId"`
+	UpdatedAt       time.Time `json:"updatedAt" firestore:"updatedAt"`
+
+	// ACCEPTED_OVERLAYS AND PENDING_PROPOSALS DELETED
 }
 
-// --- Protobuf Converters ---
+// --- Protobuf Converters for Session ---
 
 func SessionToProto(native *Session) *builderv1.SessionPb {
 	if native == nil {
 		return nil
 	}
 
-	overlays := make(map[string]*builderv1.FileStatePb)
-	for k, v := range native.AcceptedOverlays {
-		overlays[k] = &builderv1.FileStatePb{
-			Content:   v.Content,
-			IsDeleted: v.IsDeleted,
-		}
-	}
-
-	proposals := make(map[string]*builderv1.ChangeProposalPb)
-	for k, v := range native.PendingProposals {
-		proposals[k] = &builderv1.ChangeProposalPb{
-			Id:         v.ID,
-			FilePath:   v.FilePath,
-			NewContent: v.NewContent,
-			Reasoning:  v.Reasoning,
-			Status:     string(v.Status),
-			CreatedAt:  v.CreatedAt.Format(time.RFC3339),
-		}
-	}
-
 	return &builderv1.SessionPb{
-		Id:               native.ID,
-		CompiledCacheId:  native.CompiledCacheID,
-		AcceptedOverlays: overlays,
-		PendingProposals: proposals,
-		UpdatedAt:        native.UpdatedAt.Format(time.RFC3339),
+		Id:              native.ID,
+		CompiledCacheId: native.CompiledCacheID,
+		UpdatedAt:       native.UpdatedAt.Format(time.RFC3339),
 	}
 }
 
-// MarshalJSON uses protojson to ensure exact gRPC/Protobuf JSON mapping
 func (s Session) MarshalJSON() ([]byte, error) {
 	return protojsonMarshalOptions.Marshal(SessionToProto(&s))
 }
@@ -87,26 +66,43 @@ func (s *Session) UnmarshalJSON(data []byte) error {
 	s.CompiledCacheID = pb.CompiledCacheId
 	s.UpdatedAt, _ = time.Parse(time.RFC3339, pb.UpdatedAt)
 
-	s.AcceptedOverlays = make(map[string]FileState)
-	for k, v := range pb.AcceptedOverlays {
-		s.AcceptedOverlays[k] = FileState{
-			Content:   v.Content,
-			IsDeleted: v.IsDeleted,
-		}
+	return nil
+}
+
+// --- Protobuf Converters for ChangeProposal ---
+
+func ChangeProposalToProto(native *ChangeProposal) *builderv1.ChangeProposalPb {
+	if native == nil {
+		return nil
+	}
+	return &builderv1.ChangeProposalPb{
+		Id:         native.ID,
+		SessionId:  native.SessionID,
+		FilePath:   native.FilePath,
+		NewContent: native.NewContent,
+		Reasoning:  native.Reasoning,
+		Status:     string(native.Status),
+		CreatedAt:  native.CreatedAt.Format(time.RFC3339),
+	}
+}
+
+func (p ChangeProposal) MarshalJSON() ([]byte, error) {
+	return protojsonMarshalOptions.Marshal(ChangeProposalToProto(&p))
+}
+
+func (p *ChangeProposal) UnmarshalJSON(data []byte) error {
+	var pb builderv1.ChangeProposalPb
+	if err := protojsonUnmarshalOptions.Unmarshal(data, &pb); err != nil {
+		return err
 	}
 
-	s.PendingProposals = make(map[string]ChangeProposal)
-	for k, v := range pb.PendingProposals {
-		createdAt, _ := time.Parse(time.RFC3339, v.CreatedAt)
-		s.PendingProposals[k] = ChangeProposal{
-			ID:         v.Id,
-			FilePath:   v.FilePath,
-			NewContent: v.NewContent,
-			Reasoning:  v.Reasoning,
-			Status:     ProposalStatus(v.Status),
-			CreatedAt:  createdAt,
-		}
-	}
+	p.ID = pb.Id
+	p.SessionID = pb.SessionId
+	p.FilePath = pb.FilePath
+	p.NewContent = pb.NewContent
+	p.Reasoning = pb.Reasoning
+	p.Status = ProposalStatus(pb.Status)
+	p.CreatedAt, _ = time.Parse(time.RFC3339, pb.CreatedAt)
 
 	return nil
 }
