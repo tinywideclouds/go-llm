@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/bmatcuk/doublestar/v4 v4.10.0
-	github.com/tinywideclouds/gen-llm v0.0.6-beta
+	github.com/tinywideclouds/gen-llm v0.0.7-beta
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 )

@@ -12,6 +12,7 @@ type CompiledCache struct {
 	Provider        string       `json:"provider" firestore:"provider"`
 	AttachmentsUsed []Attachment `json:"attachmentsUsed" firestore:"attachmentsUsed"`
 	CreatedAt       time.Time    `json:"createdAt" firestore:"createdAt"`
+	ExpiresAt       time.Time    `json:"expiresAt" firestore:"expiresAt"`
 }
 
 // --- Protobuf Converters ---
@@ -40,6 +41,7 @@ func CompiledCacheToProto(native *CompiledCache) *builderv1.CompiledCachePb {
 		Provider:        native.Provider,
 		AttachmentsUsed: attachments,
 		CreatedAt:       native.CreatedAt.Format(time.RFC3339),
+		ExpiresAt:       native.ExpiresAt.Format(time.RFC3339),
 	}
 }
 
@@ -57,6 +59,7 @@ func (c *CompiledCache) UnmarshalJSON(data []byte) error {
 	c.ExternalID = pb.ExternalId
 	c.Provider = pb.Provider
 	c.CreatedAt, _ = time.Parse(time.RFC3339, pb.CreatedAt)
+	c.ExpiresAt, _ = time.Parse(time.RFC3339, pb.ExpiresAt)
 
 	c.AttachmentsUsed = make([]Attachment, 0, len(pb.AttachmentsUsed))
 	for _, a := range pb.AttachmentsUsed {

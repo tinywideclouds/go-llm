@@ -82,7 +82,6 @@ func ChangeProposalToProto(native *ChangeProposal) *builderv1.ChangeProposalPb {
 		SessionId: native.SessionID,
 		FilePath:  native.FilePath,
 		Reasoning: native.Reasoning,
-		Status:    string(native.Status),
 		CreatedAt: native.CreatedAt.Format(time.RFC3339),
 	}
 
@@ -110,7 +109,6 @@ func (p *ChangeProposal) UnmarshalJSON(data []byte) error {
 	p.SessionID = pb.SessionId
 	p.FilePath = pb.FilePath
 	p.Reasoning = pb.Reasoning
-	p.Status = ProposalStatus(pb.Status)
 	p.CreatedAt, _ = time.Parse(time.RFC3339, pb.CreatedAt)
 
 	if pb.Patch != nil {

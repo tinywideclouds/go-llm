@@ -1,6 +1,8 @@
 package builder
 
 import (
+	"time"
+
 	builderv1 "github.com/tinywideclouds/gen-llm/go/types/builder/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -18,11 +20,13 @@ var (
 // --- BUILD CACHE RESPONSE ---
 
 type BuildCacheResponse struct {
-	GeminiCacheId string `json:"geminiCacheId"`
+	GeminiCacheId string    `json:"geminiCacheId"`
+	ExpiresAt     time.Time `json:"expiresAt"`
 }
 
 func (pk BuildCacheResponse) MarshalJSON() ([]byte, error) {
-	protoPb := &builderv1.BuildCacheResponsePb{GeminiCacheId: pk.GeminiCacheId}
+	expires := pk.ExpiresAt.Format(time.RFC1123)
+	protoPb := &builderv1.BuildCacheResponsePb{GeminiCacheId: pk.GeminiCacheId, ExpiresAt: expires}
 	return protojsonMarshalOptions.Marshal(protoPb)
 }
 
@@ -32,6 +36,11 @@ func (pk *BuildCacheResponse) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	pk.GeminiCacheId = protoPb.GeminiCacheId
+	expiresAt, err := time.Parse(protoPb.ExpiresAt, time.RFC3339)
+	if err != nil {
+		expiresAt = time.Now().Add(time.Hour)
+	}
+	pk.ExpiresAt = expiresAt
 	return nil
 }
 
@@ -44,9 +53,10 @@ type Attachment struct {
 }
 
 type BuildCacheRequest struct {
-	SessionID   string       `json:"sessionId"`
-	Model       string       `json:"model"`
-	Attachments []Attachment `json:"attachments"`
+	SessionID     string       `json:"sessionId"`
+	Model         string       `json:"model"`
+	Attachments   []Attachment `json:"attachments"`
+	ExpiresAtHint time.Time    `json:"expiresAtHint"`
 }
 
 func CacheRequestToProto(native *BuildCacheRequest) *builderv1.BuildCacheRequestPb {
@@ -69,10 +79,13 @@ func CacheRequestToProto(native *BuildCacheRequest) *builderv1.BuildCacheRequest
 		attachments = append(attachments, pbAtt)
 	}
 
+	expiresHint := native.ExpiresAtHint.Format(time.RFC1123)
+
 	return &builderv1.BuildCacheRequestPb{
-		SessionId:   native.SessionID,
-		Model:       native.Model,
-		Attachments: attachments,
+		SessionId:     native.SessionID,
+		Model:         native.Model,
+		Attachments:   attachments,
+		ExpiresAtHint: &expiresHint,
 	}
 }
 
@@ -100,6 +113,15 @@ func (pk *BuildCacheRequest) UnmarshalJSON(data []byte) error {
 		}
 		pk.Attachments = append(pk.Attachments, att)
 	}
+
+	if protoPb.ExpiresAtHint != nil {
+		expires, err := time.Parse(*protoPb.ExpiresAtHint, time.RFC3339)
+		if err != nil {
+			return err
+		}
+		pk.ExpiresAtHint = expires
+	}
+
 	return nil
 }
 
