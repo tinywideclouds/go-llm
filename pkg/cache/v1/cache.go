@@ -2,73 +2,81 @@ package cache
 
 import (
 	cachev1 "github.com/tinywideclouds/gen-llm/go/types/cache/v1"
-	"google.golang.org/protobuf/encoding/protojson"
+	"github.com/tinywideclouds/go-llm/pkg/yaml/filter"
 )
 
-// --- Marshal/Unmarshal Options ---
-var (
-	protojsonMarshalOptions = &protojson.MarshalOptions{
-		UseProtoNames:   false, // Use camelCase
-		EmitUnpopulated: false,
-	}
-	protojsonUnmarshalOptions = &protojson.UnmarshalOptions{
-		DiscardUnknown: true,
-	}
-)
+// --- API Request Types ---
 
-type StoreCollections struct {
-	BundleCollection   string
-	FilesCollection    string
-	ProfilesCollection string
+type CreateCacheRequest struct {
+	Repo   string `json:"repo"`
+	Branch string `json:"branch"`
 }
 
-// ToProto converts the idiomatic Go struct into its Protobuf representation.
-func ToProto(native *StoreCollections) *cachev1.StoreCollectionsPb {
-	if native == nil {
-		return nil
+func (req CreateCacheRequest) MarshalJSON() ([]byte, error) {
+	pb := &cachev1.CreateCacheRequestPb{
+		Repo:   req.Repo,
+		Branch: req.Branch,
 	}
-	return &cachev1.StoreCollectionsPb{}
+	return protojsonMarshalOptions.Marshal(pb)
 }
 
-// FromProto converts the Protobuf representation into the idiomatic Go struct.
-func FromProto(proto *cachev1.StoreCollectionsPb) (*StoreCollections, error) {
-	if proto == nil {
-		return nil, nil
-	}
-	return &StoreCollections{}, nil
-}
-
-// --- JSON METHODS ---
-
-// MarshalJSON implements the json.Marshaler interface.
-func (pk StoreCollections) MarshalJSON() ([]byte, error) {
-	// 1. Convert native Go struct to Protobuf struct
-	// Note: We pass a pointer to ToProto
-	protoPb := ToProto(&pk)
-
-	// 2. Marshal using our camelCase options
-	return protojsonMarshalOptions.Marshal(protoPb)
-}
-
-// UnmarshalJSON implements the json.Unmarshaler interface.
-// This remains a POINTER RECEIVER (*pk), which is correct
-// because it needs to modify the struct it's called on.
-func (pk *StoreCollections) UnmarshalJSON(data []byte) error {
-	var protoPb cachev1.StoreCollectionsPb
-
-	if err := protojsonUnmarshalOptions.Unmarshal(data, &protoPb); err != nil {
+func (req *CreateCacheRequest) UnmarshalJSON(data []byte) error {
+	var pb cachev1.CreateCacheRequestPb
+	if err := protojsonUnmarshalOptions.Unmarshal(data, &pb); err != nil {
 		return err
 	}
+	req.Repo = pb.Repo
+	req.Branch = pb.Branch
+	return nil
+}
 
-	native, err := FromProto(&protoPb)
-	if err != nil {
+type SyncRequest struct {
+	IngestionRules filter.FilterRules `json:"ingestionRules"`
+}
+
+func (req SyncRequest) MarshalJSON() ([]byte, error) {
+	pb := &cachev1.SyncRequestPb{
+		IngestionRules: &cachev1.FilterRulesPb{
+			Include: req.IngestionRules.Include,
+			Exclude: req.IngestionRules.Exclude,
+		},
+	}
+	return protojsonMarshalOptions.Marshal(pb)
+}
+
+func (req *SyncRequest) UnmarshalJSON(data []byte) error {
+	var pb cachev1.SyncRequestPb
+	if err := protojsonUnmarshalOptions.Unmarshal(data, &pb); err != nil {
 		return err
 	}
-
-	if native != nil {
-		*pk = *native
-	} else {
-		*pk = StoreCollections{}
+	if pb.IngestionRules != nil {
+		req.IngestionRules = filter.FilterRules{
+			Include: pb.IngestionRules.Include,
+			Exclude: pb.IngestionRules.Exclude,
+		}
 	}
+	return nil
+}
+
+type ProfileRequest struct {
+	Name      string `json:"name"`
+	RulesYaml string `json:"rulesYaml"`
+}
+
+func (req ProfileRequest) MarshalJSON() ([]byte, error) {
+	pb := &cachev1.ProfileRequestPb{
+		Name:      req.Name,
+		RulesYaml: req.RulesYaml,
+	}
+	return protojsonMarshalOptions.Marshal(pb)
+}
+
+func (req *ProfileRequest) UnmarshalJSON(data []byte) error {
+	var pb cachev1.ProfileRequestPb
+	if err := protojsonUnmarshalOptions.Unmarshal(data, &pb); err != nil {
+		return err
+	}
+	req.Name = pb.Name
+	req.RulesYaml = pb.RulesYaml
 	return nil
 }
