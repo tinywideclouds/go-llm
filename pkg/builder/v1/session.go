@@ -4,14 +4,7 @@ import (
 	"time"
 
 	builderv1 "github.com/tinywideclouds/gen-llm/go/types/builder/v1"
-)
-
-type ProposalStatus string
-
-const (
-	StatusPending  ProposalStatus = "pending"
-	StatusAccepted ProposalStatus = "accepted"
-	StatusRejected ProposalStatus = "rejected"
+	urn "github.com/tinywideclouds/go-platform/pkg/net/v1"
 )
 
 type FileState struct {
@@ -21,19 +14,18 @@ type FileState struct {
 
 // ChangeProposal represents a document in the Global Diff Registry
 type ChangeProposal struct {
-	ID         string         `json:"id" firestore:"-"`
-	SessionID  string         `json:"sessionId" firestore:"sessionId"`
-	FilePath   string         `json:"filePath" firestore:"filePath"`
-	Patch      string         `json:"patch,omitempty" firestore:"patch,omitempty"`           // NEW
-	NewContent string         `json:"newContent,omitempty" firestore:"newContent,omitempty"` // UPDATED
-	Reasoning  string         `json:"reasoning" firestore:"reasoning"`
-	Status     ProposalStatus `json:"status" firestore:"status"`
-	CreatedAt  time.Time      `json:"createdAt" firestore:"createdAt"`
+	ID         string    `json:"id" firestore:"-"`
+	SessionID  urn.URN   `json:"sessionId" firestore:"sessionId"`
+	FilePath   string    `json:"filePath" firestore:"filePath"`
+	Patch      string    `json:"patch,omitempty" firestore:"patch,omitempty"`
+	NewContent string    `json:"newContent,omitempty" firestore:"newContent,omitempty"`
+	Reasoning  string    `json:"reasoning" firestore:"reasoning"`
+	CreatedAt  time.Time `json:"createdAt" firestore:"createdAt"`
 }
 
 type Session struct {
-	ID              string    `json:"id" firestore:"-"`
-	CompiledCacheID string    `json:"compiledCacheId" firestore:"compiledCacheId"`
+	ID              urn.URN   `json:"id" firestore:"-"`
+	CompiledCacheID urn.URN   `json:"compiledCacheId" firestore:"compiledCacheId"`
 	UpdatedAt       time.Time `json:"updatedAt" firestore:"updatedAt"`
 
 	// ACCEPTED_OVERLAYS AND PENDING_PROPOSALS DELETED
@@ -47,8 +39,8 @@ func SessionToProto(native *Session) *builderv1.SessionPb {
 	}
 
 	return &builderv1.SessionPb{
-		Id:              native.ID,
-		CompiledCacheId: native.CompiledCacheID,
+		Id:              native.ID.String(),
+		CompiledCacheId: native.CompiledCacheID.String(),
 		UpdatedAt:       native.UpdatedAt.Format(time.RFC3339),
 	}
 }
@@ -63,8 +55,14 @@ func (s *Session) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	s.ID = pb.Id
-	s.CompiledCacheID = pb.CompiledCacheId
+	id, err := urn.Parse(pb.Id)
+	c, err := urn.Parse(pb.CompiledCacheId)
+
+	if err != nil {
+		return err
+	}
+	s.ID = id
+	s.CompiledCacheID = c
 	s.UpdatedAt, _ = time.Parse(time.RFC3339, pb.UpdatedAt)
 
 	return nil
@@ -79,7 +77,7 @@ func ChangeProposalToProto(native *ChangeProposal) *builderv1.ChangeProposalPb {
 
 	pb := &builderv1.ChangeProposalPb{
 		Id:        native.ID,
-		SessionId: native.SessionID,
+		SessionId: native.SessionID.String(),
 		FilePath:  native.FilePath,
 		Reasoning: native.Reasoning,
 		CreatedAt: native.CreatedAt.Format(time.RFC3339),
@@ -105,8 +103,13 @@ func (p *ChangeProposal) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	s, err := urn.Parse(pb.SessionId)
+	if err != nil {
+		return err
+	}
+
 	p.ID = pb.Id
-	p.SessionID = pb.SessionId
+	p.SessionID = s
 	p.FilePath = pb.FilePath
 	p.Reasoning = pb.Reasoning
 	p.CreatedAt, _ = time.Parse(time.RFC3339, pb.CreatedAt)

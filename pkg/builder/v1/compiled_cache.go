@@ -4,15 +4,17 @@ import (
 	"time"
 
 	builderv1 "github.com/tinywideclouds/gen-llm/go/types/builder/v1"
+	urn "github.com/tinywideclouds/go-platform/pkg/net/v1"
 )
 
+type CompiledCacheProvider string
+
 type CompiledCache struct {
-	ID              string       `json:"id" firestore:"-"`
-	ExternalID      string       `json:"externalId" firestore:"externalId"`
-	Provider        string       `json:"provider" firestore:"provider"`
-	AttachmentsUsed []Attachment `json:"attachmentsUsed" firestore:"attachmentsUsed"`
-	CreatedAt       time.Time    `json:"createdAt" firestore:"createdAt"`
-	ExpiresAt       time.Time    `json:"expiresAt" firestore:"expiresAt"`
+	ID              urn.URN               `json:"id" firestore:"-"`
+	Provider        CompiledCacheProvider `json:"provider" firestore:"provider"`
+	AttachmentsUsed []Attachment          `json:"attachmentsUsed" firestore:"attachmentsUsed"`
+	CreatedAt       time.Time             `json:"createdAt" firestore:"createdAt"`
+	ExpiresAt       time.Time             `json:"expiresAt" firestore:"expiresAt"`
 }
 
 // --- Protobuf Converters ---
@@ -22,24 +24,10 @@ func CompiledCacheToProto(native *CompiledCache) *builderv1.CompiledCachePb {
 		return nil
 	}
 
-	attachments := make([]*builderv1.NetworkAttachmentPb, 0, len(native.AttachmentsUsed))
-	for _, att := range native.AttachmentsUsed {
-		pbAtt := &builderv1.NetworkAttachmentPb{
-			Id:      att.ID,
-			CacheId: att.CacheID,
-		}
-		if att.ProfileID != "" {
-			pid := att.ProfileID
-			pbAtt.ProfileId = &pid
-		}
-		attachments = append(attachments, pbAtt)
-	}
-
 	return &builderv1.CompiledCachePb{
-		Id:              native.ID,
-		ExternalId:      native.ExternalID,
-		Provider:        native.Provider,
-		AttachmentsUsed: attachments,
+		Id:              native.ID.String(),
+		Provider:        string(native.Provider),
+		AttachmentsUsed: AttachmentsToProto(native.AttachmentsUsed),
 		CreatedAt:       native.CreatedAt.Format(time.RFC3339),
 		ExpiresAt:       native.ExpiresAt.Format(time.RFC3339),
 	}
@@ -55,22 +43,18 @@ func (c *CompiledCache) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	c.ID = pb.Id
-	c.ExternalID = pb.ExternalId
-	c.Provider = pb.Provider
+	ID, err := urn.Parse(pb.Id)
+	if err != nil {
+		return err
+	}
+	c.ID = ID
+	c.Provider = CompiledCacheProvider(pb.Provider)
 	c.CreatedAt, _ = time.Parse(time.RFC3339, pb.CreatedAt)
 	c.ExpiresAt, _ = time.Parse(time.RFC3339, pb.ExpiresAt)
 
-	c.AttachmentsUsed = make([]Attachment, 0, len(pb.AttachmentsUsed))
-	for _, a := range pb.AttachmentsUsed {
-		att := Attachment{
-			ID:      a.Id,
-			CacheID: a.CacheId,
-		}
-		if a.ProfileId != nil {
-			att.ProfileID = *a.ProfileId
-		}
-		c.AttachmentsUsed = append(c.AttachmentsUsed, att)
+	c.AttachmentsUsed, err = ProtoToAttachments(pb.AttachmentsUsed)
+	if err != nil {
+		return err
 	}
 
 	return nil

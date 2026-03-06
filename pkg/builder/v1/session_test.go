@@ -8,14 +8,18 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tinywideclouds/go-llm/pkg/builder/v1"
+	urn "github.com/tinywideclouds/go-platform/pkg/net/v1"
 )
 
 func TestSession_JSONSerialization(t *testing.T) {
 	fixedTime := time.Date(2026, 2, 27, 12, 0, 0, 0, time.UTC)
 
+	id, _ := urn.Parse("urn:llm:sess:123")
+	cID, _ := urn.Parse("urn:gemini:compiled_cache:124/cc-eddg")
+
 	original := builder.Session{
-		ID:              "sess-123",
-		CompiledCacheID: "cc-456",
+		ID:              id,
+		CompiledCacheID: cID,
 		UpdatedAt:       fixedTime,
 	}
 
@@ -23,7 +27,7 @@ func TestSession_JSONSerialization(t *testing.T) {
 	require.NoError(t, err, "Failed to marshal Session")
 
 	jsonStr := string(data)
-	assert.Contains(t, jsonStr, `"compiledCacheId":"cc-456"`)
+	assert.Contains(t, jsonStr, `"compiledCacheId":"urn:cc:456"`)
 
 	var parsed builder.Session
 	err = json.Unmarshal(data, &parsed)
@@ -37,13 +41,15 @@ func TestSession_JSONSerialization(t *testing.T) {
 func TestChangeProposal_JSONSerialization(t *testing.T) {
 	fixedTime := time.Date(2026, 2, 27, 13, 0, 0, 0, time.UTC)
 
+	// Note: We intentionally omit the 'Status' field here because it is a
+	// Firestore-only property and does not exist in the protobuf definition.
+	s, _ := urn.Parse("urn:llm:session:123")
 	original := builder.ChangeProposal{
 		ID:         "prop-999",
-		SessionID:  "sess-123",
+		SessionID:  s,
 		FilePath:   "src/main.go",
 		NewContent: "package main",
 		Reasoning:  "Refactoring",
-		Status:     builder.StatusPending,
 		CreatedAt:  fixedTime,
 	}
 
@@ -53,7 +59,7 @@ func TestChangeProposal_JSONSerialization(t *testing.T) {
 	jsonStr := string(data)
 
 	// Verify Protobuf camelCase enforcement
-	assert.Contains(t, jsonStr, `"sessionId":"sess-123"`)
+	assert.Contains(t, jsonStr, `"sessionId":"urn:sess:123"`)
 	assert.Contains(t, jsonStr, `"filePath":"src/main.go"`)
 	assert.Contains(t, jsonStr, `"newContent":"package main"`)
 
@@ -65,6 +71,5 @@ func TestChangeProposal_JSONSerialization(t *testing.T) {
 	assert.Equal(t, original.SessionID, parsed.SessionID)
 	assert.Equal(t, original.FilePath, parsed.FilePath)
 	assert.Equal(t, original.NewContent, parsed.NewContent)
-	assert.Equal(t, original.Status, parsed.Status)
 	assert.True(t, original.CreatedAt.Equal(parsed.CreatedAt), "CreatedAt mismatch")
 }

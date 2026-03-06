@@ -4,6 +4,7 @@ import (
 	"time"
 
 	builderv1 "github.com/tinywideclouds/gen-llm/go/types/builder/v1"
+	urn "github.com/tinywideclouds/go-platform/pkg/net/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -20,13 +21,13 @@ var (
 // --- BUILD CACHE RESPONSE ---
 
 type BuildCacheResponse struct {
-	GeminiCacheId string    `json:"geminiCacheId"`
-	ExpiresAt     time.Time `json:"expiresAt"`
+	CompiledCacheId urn.URN   `json:"compiledCacheId"`
+	ExpiresAt       time.Time `json:"expiresAt"`
 }
 
 func (pk BuildCacheResponse) MarshalJSON() ([]byte, error) {
-	expires := pk.ExpiresAt.Format(time.RFC1123)
-	protoPb := &builderv1.BuildCacheResponsePb{GeminiCacheId: pk.GeminiCacheId, ExpiresAt: expires}
+	expires := pk.ExpiresAt.Format(time.RFC3339)
+	protoPb := &builderv1.BuildCacheResponsePb{CompiledCacheId: pk.CompiledCacheId.String(), ExpiresAt: expires}
 	return protojsonMarshalOptions.Marshal(protoPb)
 }
 
@@ -35,8 +36,12 @@ func (pk *BuildCacheResponse) UnmarshalJSON(data []byte) error {
 	if err := protojsonUnmarshalOptions.Unmarshal(data, &protoPb); err != nil {
 		return err
 	}
-	pk.GeminiCacheId = protoPb.GeminiCacheId
-	expiresAt, err := time.Parse(protoPb.ExpiresAt, time.RFC3339)
+	var err error
+	pk.CompiledCacheId, err = urn.Parse(protoPb.CompiledCacheId)
+	if err != nil {
+		return err
+	}
+	expiresAt, err := time.Parse(time.RFC3339, protoPb.ExpiresAt)
 	if err != nil {
 		expiresAt = time.Now().Add(time.Hour)
 	}
@@ -47,16 +52,16 @@ func (pk *BuildCacheResponse) UnmarshalJSON(data []byte) error {
 // --- BUILD CACHE REQUEST ---
 
 type Attachment struct {
-	ID        string `json:"id"`
-	CacheID   string `json:"cacheId"`
-	ProfileID string `json:"profileId,omitempty"`
+	ID        urn.URN  `json:"id"`
+	CacheID   urn.URN  `json:"cacheId"`
+	ProfileID *urn.URN `json:"profileId,omitempty"`
 }
 
 type BuildCacheRequest struct {
-	SessionID     string       `json:"sessionId"`
+	SessionID     urn.URN      `json:"sessionId"`
 	Model         string       `json:"model"`
 	Attachments   []Attachment `json:"attachments"`
-	ExpiresAtHint time.Time    `json:"expiresAtHint"`
+	ExpiresAtHint *time.Time   `json:"expiresAtHint,omitempty"`
 }
 
 func CacheRequestToProto(native *BuildCacheRequest) *builderv1.BuildCacheRequestPb {
@@ -64,29 +69,18 @@ func CacheRequestToProto(native *BuildCacheRequest) *builderv1.BuildCacheRequest
 		return nil
 	}
 
-	// FIX: Pre-allocate capacity, but start length at 0, then append correctly.
-	attachments := make([]*builderv1.NetworkAttachmentPb, 0, len(native.Attachments))
-
-	for _, m := range native.Attachments {
-		pbAtt := &builderv1.NetworkAttachmentPb{
-			Id:      m.ID,
-			CacheId: m.CacheID,
-		}
-		if m.ProfileID != "" {
-			pid := m.ProfileID // Need a local variable to take the pointer
-			pbAtt.ProfileId = &pid
-		}
-		attachments = append(attachments, pbAtt)
+	pb := &builderv1.BuildCacheRequestPb{
+		SessionId:   native.SessionID.String(),
+		Model:       native.Model,
+		Attachments: AttachmentsToProto(native.Attachments),
 	}
 
-	expiresHint := native.ExpiresAtHint.Format(time.RFC1123)
-
-	return &builderv1.BuildCacheRequestPb{
-		SessionId:     native.SessionID,
-		Model:         native.Model,
-		Attachments:   attachments,
-		ExpiresAtHint: &expiresHint,
+	if native.ExpiresAtHint != nil {
+		expiresHint := native.ExpiresAtHint.Format(time.RFC3339)
+		pb.ExpiresAtHint = &expiresHint
 	}
+
+	return pb
 }
 
 func (pk BuildCacheRequest) MarshalJSON() ([]byte, error) {
@@ -95,31 +89,30 @@ func (pk BuildCacheRequest) MarshalJSON() ([]byte, error) {
 
 func (pk *BuildCacheRequest) UnmarshalJSON(data []byte) error {
 	var protoPb builderv1.BuildCacheRequestPb
-	if err := protojsonUnmarshalOptions.Unmarshal(data, &protoPb); err != nil {
+	err := protojsonUnmarshalOptions.Unmarshal(data, &protoPb)
+	if err != nil {
 		return err
 	}
 
-	pk.SessionID = protoPb.SessionId
+	sessionID, err := urn.Parse(protoPb.SessionId)
+	if err != nil {
+		return err
+	}
+
+	pk.SessionID = sessionID
 	pk.Model = protoPb.Model
 
-	pk.Attachments = make([]Attachment, 0, len(protoPb.Attachments))
-	for _, a := range protoPb.Attachments {
-		att := Attachment{
-			ID:      a.Id,
-			CacheID: a.CacheId,
-		}
-		if a.ProfileId != nil {
-			att.ProfileID = *a.ProfileId
-		}
-		pk.Attachments = append(pk.Attachments, att)
+	pk.Attachments, err = ProtoToAttachments(protoPb.Attachments)
+	if err != nil {
+		return err
 	}
 
 	if protoPb.ExpiresAtHint != nil {
-		expires, err := time.Parse(*protoPb.ExpiresAtHint, time.RFC3339)
+		expires, err := time.Parse(time.RFC3339, *protoPb.ExpiresAtHint)
 		if err != nil {
 			return err
 		}
-		pk.ExpiresAtHint = expires
+		pk.ExpiresAtHint = &expires
 	}
 
 	return nil
@@ -135,10 +128,10 @@ type Message struct {
 }
 
 type GenerateStreamRequest struct {
-	SessionID         string       `json:"sessionId"`
+	SessionID         urn.URN      `json:"sessionId"`
 	Model             string       `json:"model"`
 	History           []Message    `json:"history"`
-	GeminiCacheID     string       `json:"geminiCacheId,omitempty"`
+	CompiledCacheID   *urn.URN     `json:"compiledCacheId,omitempty"`
 	InlineAttachments []Attachment `json:"inlineAttachments,omitempty"`
 }
 
@@ -157,29 +150,16 @@ func ToStreamProto(native *GenerateStreamRequest) *builderv1.GenerateStreamReque
 		})
 	}
 
-	inlines := make([]*builderv1.NetworkAttachmentPb, 0, len(native.InlineAttachments))
-	for _, a := range native.InlineAttachments {
-		pbAtt := &builderv1.NetworkAttachmentPb{
-			Id:      a.ID,
-			CacheId: a.CacheID,
-		}
-		if a.ProfileID != "" {
-			pid := a.ProfileID
-			pbAtt.ProfileId = &pid
-		}
-		inlines = append(inlines, pbAtt)
-	}
-
 	pb := &builderv1.GenerateStreamRequestPb{
-		SessionId:         native.SessionID,
+		SessionId:         native.SessionID.String(),
 		Model:             native.Model,
 		History:           history,
-		InlineAttachments: inlines,
+		InlineAttachments: AttachmentsToProto(native.InlineAttachments),
 	}
 
-	if native.GeminiCacheID != "" {
-		cid := native.GeminiCacheID
-		pb.GeminiCacheId = &cid
+	if native.CompiledCacheID != nil {
+		c := native.CompiledCacheID.String()
+		pb.CompiledCacheId = &c
 	}
 
 	return pb
@@ -195,11 +175,19 @@ func (pk *GenerateStreamRequest) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	pk.SessionID = protoPb.SessionId
+	sessionID, err := urn.Parse(protoPb.SessionId)
+	if err != nil {
+		return err
+	}
+	pk.SessionID = sessionID
 	pk.Model = protoPb.Model
 
-	if protoPb.GeminiCacheId != nil {
-		pk.GeminiCacheID = *protoPb.GeminiCacheId
+	if protoPb.CompiledCacheId != nil {
+		c, err := urn.Parse(*protoPb.CompiledCacheId)
+		if err != nil {
+			return err
+		}
+		pk.CompiledCacheID = &c
 	}
 
 	pk.History = make([]Message, 0, len(protoPb.History))
@@ -212,17 +200,55 @@ func (pk *GenerateStreamRequest) UnmarshalJSON(data []byte) error {
 		})
 	}
 
-	pk.InlineAttachments = make([]Attachment, 0, len(protoPb.InlineAttachments))
-	for _, a := range protoPb.InlineAttachments {
-		att := Attachment{
-			ID:      a.Id,
-			CacheID: a.CacheId,
-		}
-		if a.ProfileId != nil {
-			att.ProfileID = *a.ProfileId
-		}
-		pk.InlineAttachments = append(pk.InlineAttachments, att)
+	pk.InlineAttachments, err = ProtoToAttachments(protoPb.InlineAttachments)
+	if err != nil {
+		return err
 	}
 
 	return nil
+}
+
+// --- HELPERS ---
+
+func AttachmentsToProto(native []Attachment) []*builderv1.NetworkAttachmentPb {
+	attachments := make([]*builderv1.NetworkAttachmentPb, 0, len(native))
+	for _, m := range native {
+		pbAtt := &builderv1.NetworkAttachmentPb{
+			Id:      m.ID.String(),
+			CacheId: m.CacheID.String(),
+		}
+		if m.ProfileID != nil {
+			pid := m.ProfileID.String()
+			pbAtt.ProfileId = &pid
+		}
+		attachments = append(attachments, pbAtt)
+	}
+	return attachments
+}
+
+func ProtoToAttachments(pb []*builderv1.NetworkAttachmentPb) ([]Attachment, error) {
+	attachments := make([]Attachment, 0, len(pb))
+	for _, a := range pb {
+		id, err := urn.Parse(a.Id)
+		if err != nil {
+			return nil, err
+		}
+		cacheID, err := urn.Parse(a.CacheId)
+		if err != nil {
+			return nil, err
+		}
+		att := Attachment{
+			ID:      id,
+			CacheID: cacheID,
+		}
+		if a.ProfileId != nil {
+			profileID, err := urn.Parse(*a.ProfileId)
+			if err != nil {
+				return nil, err
+			}
+			att.ProfileID = &profileID
+		}
+		attachments = append(attachments, att)
+	}
+	return attachments, nil
 }
