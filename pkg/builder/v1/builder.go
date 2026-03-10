@@ -52,15 +52,15 @@ func (pk *BuildCacheResponse) UnmarshalJSON(data []byte) error {
 // --- BUILD CACHE REQUEST ---
 
 type Attachment struct {
-	ID        urn.URN  `json:"id"`
-	CacheID   urn.URN  `json:"cacheId"`
-	ProfileID *urn.URN `json:"profileId,omitempty"`
+	ID           urn.URN  `json:"id"`
+	DataSourceID urn.URN  `json:"dataSourceId"` // Updated from CacheID
+	ProfileID    *urn.URN `json:"profileId,omitempty"`
 }
 
 type BuildCacheRequest struct {
-	SessionID     urn.URN      `json:"sessionId"`
+	// SessionID removed
 	Model         string       `json:"model"`
-	Attachments   []Attachment `json:"attachments"`
+	Sources       []Attachment `json:"sources"` // Updated from Attachments
 	ExpiresAtHint *time.Time   `json:"expiresAtHint,omitempty"`
 }
 
@@ -70,9 +70,8 @@ func CacheRequestToProto(native *BuildCacheRequest) *builderv1.BuildCacheRequest
 	}
 
 	pb := &builderv1.BuildCacheRequestPb{
-		SessionId:   native.SessionID.String(),
-		Model:       native.Model,
-		Attachments: AttachmentsToProto(native.Attachments),
+		Model:   native.Model,
+		Sources: AttachmentsToProto(native.Sources),
 	}
 
 	if native.ExpiresAtHint != nil {
@@ -94,15 +93,9 @@ func (pk *BuildCacheRequest) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	sessionID, err := urn.Parse(protoPb.SessionId)
-	if err != nil {
-		return err
-	}
-
-	pk.SessionID = sessionID
 	pk.Model = protoPb.Model
 
-	pk.Attachments, err = ProtoToAttachments(protoPb.Attachments)
+	pk.Sources, err = ProtoToAttachments(protoPb.Sources)
 	if err != nil {
 		return err
 	}
@@ -214,8 +207,8 @@ func AttachmentsToProto(native []Attachment) []*builderv1.NetworkAttachmentPb {
 	attachments := make([]*builderv1.NetworkAttachmentPb, 0, len(native))
 	for _, m := range native {
 		pbAtt := &builderv1.NetworkAttachmentPb{
-			Id:      m.ID.String(),
-			CacheId: m.CacheID.String(),
+			Id:           m.ID.String(),
+			DataSourceId: m.DataSourceID.String(),
 		}
 		if m.ProfileID != nil {
 			pid := m.ProfileID.String()
@@ -233,13 +226,13 @@ func ProtoToAttachments(pb []*builderv1.NetworkAttachmentPb) ([]Attachment, erro
 		if err != nil {
 			return nil, err
 		}
-		cacheID, err := urn.Parse(a.CacheId)
+		dataSourceID, err := urn.Parse(a.DataSourceId)
 		if err != nil {
 			return nil, err
 		}
 		att := Attachment{
-			ID:      id,
-			CacheID: cacheID,
+			ID:           id,
+			DataSourceID: dataSourceID,
 		}
 		if a.ProfileId != nil {
 			profileID, err := urn.Parse(*a.ProfileId)

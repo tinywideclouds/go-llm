@@ -10,11 +10,11 @@ import (
 type CompiledCacheProvider string
 
 type CompiledCache struct {
-	ID              urn.URN               `json:"id" firestore:"-"`
-	Provider        CompiledCacheProvider `json:"provider" firestore:"provider"`
-	AttachmentsUsed []Attachment          `json:"attachmentsUsed" firestore:"attachmentsUsed"`
-	CreatedAt       time.Time             `json:"createdAt" firestore:"createdAt"`
-	ExpiresAt       time.Time             `json:"expiresAt" firestore:"expiresAt"`
+	ID        urn.URN               `json:"id" firestore:"-"`
+	Provider  CompiledCacheProvider `json:"provider" firestore:"provider"`
+	Sources   []Attachment          `json:"sources" firestore:"sources"` // Updated
+	CreatedAt time.Time             `json:"createdAt" firestore:"createdAt"`
+	ExpiresAt time.Time             `json:"expiresAt" firestore:"expiresAt"`
 }
 
 // --- Protobuf Converters ---
@@ -25,11 +25,11 @@ func CompiledCacheToProto(native *CompiledCache) *builderv1.CompiledCachePb {
 	}
 
 	return &builderv1.CompiledCachePb{
-		Id:              native.ID.String(),
-		Provider:        string(native.Provider),
-		AttachmentsUsed: AttachmentsToProto(native.AttachmentsUsed),
-		CreatedAt:       native.CreatedAt.Format(time.RFC3339),
-		ExpiresAt:       native.ExpiresAt.Format(time.RFC3339),
+		Id:        native.ID.String(),
+		Provider:  string(native.Provider),
+		Sources:   AttachmentsToProto(native.Sources),
+		CreatedAt: native.CreatedAt.Format(time.RFC3339),
+		ExpiresAt: native.ExpiresAt.Format(time.RFC3339),
 	}
 }
 
@@ -52,7 +52,7 @@ func (c *CompiledCache) UnmarshalJSON(data []byte) error {
 	c.CreatedAt, _ = time.Parse(time.RFC3339, pb.CreatedAt)
 	c.ExpiresAt, _ = time.Parse(time.RFC3339, pb.ExpiresAt)
 
-	c.AttachmentsUsed, err = ProtoToAttachments(pb.AttachmentsUsed)
+	c.Sources, err = ProtoToAttachments(pb.Sources)
 	if err != nil {
 		return err
 	}

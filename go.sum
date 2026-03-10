@@ -1,5 +1,3 @@
-github.com/bmatcuk/doublestar/v4 v4.10.0 h1:zU9WiOla1YA122oLM6i4EXvGW62DvKZVxIe6TYWexEs=
-github.com/bmatcuk/doublestar/v4 v4.10.0/go.mod h1:xBQ8jztBU6kakFMg+8WGxn0c6z1fTSPVIjEY1Wr7jzc=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
@@ -8,8 +6,8 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
-github.com/tinywideclouds/gen-llm v0.0.9-beta h1:KTl0ZoXBl9b/n8tQrz7r3aaQiUW3mBxq5BTQpMDMdWU=
-github.com/tinywideclouds/gen-llm v0.0.9-beta/go.mod h1:GyMVJCTUhypm8TSLleWT+Kxpzl9WZQILM+4EdAWb3UA=
+github.com/tinywideclouds/gen-llm v0.0.10-beta h1:nikoAeui9hxM85O7a2lMvXqMTOwc37seHxtD/lewj6U=
+github.com/tinywideclouds/gen-llm v0.0.10-beta/go.mod h1:NhcJjkskB88qxDyfEqpYGWyy2sdWmt4MXBRXWKGWIbs=
 github.com/tinywideclouds/gen-platform v0.0.6 h1:9VkhDDBbb5888GH0ST7VpLQdXwLh6bUoI+HStgd1Eng=
 github.com/tinywideclouds/gen-platform v0.0.6/go.mod h1:COG3BwD4rMgdquKXsTui0nNaI9w/b4hbgmBVDOjwGqg=
 github.com/tinywideclouds/go-platform v0.0.11 h1:QxOtaftFar5gHkhKg/aKX5q0FsiYFpE6BQtpVjo/dHQ=

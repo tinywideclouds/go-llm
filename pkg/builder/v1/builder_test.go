@@ -26,13 +26,12 @@ func urnPtr(s string) *urn.URN {
 func TestBuildCacheRequest_JSON(t *testing.T) {
 	t.Run("Marshal to camelCase", func(t *testing.T) {
 		req := builder.BuildCacheRequest{
-			SessionID: mustURN("urn:llm:session:123"),
-			Model:     "gemini-1.5-pro",
-			Attachments: []builder.Attachment{
+			Model: "gemini-1.5-pro",
+			Sources: []builder.Attachment{
 				{
-					ID:        mustURN("urn:llm:attachment:1"),
-					CacheID:   mustURN("urn:llm:cache:abc"),
-					ProfileID: urnPtr("urn:llm:profile:xyz"),
+					ID:           mustURN("urn:llm:attachment:1"),
+					DataSourceID: mustURN("urn:llm:cache:abc"),
+					ProfileID:    urnPtr("urn:llm:profile:xyz"),
 				},
 			},
 		}
@@ -45,8 +44,8 @@ func TestBuildCacheRequest_JSON(t *testing.T) {
 		jsonStr := string(data)
 
 		// Verify protobuf forced camelCase outputs
-		if !strings.Contains(jsonStr, `"sessionId":"urn:llm:session:123"`) {
-			t.Errorf("Expected camelCase sessionId, got: %s", jsonStr)
+		if !strings.Contains(jsonStr, `"dataSourceId":"urn:llm:cache:abc"`) {
+			t.Errorf("Expected camelCase dataSourceId, got: %s", jsonStr)
 		}
 		if !strings.Contains(jsonStr, `"profileId":"urn:llm:profile:xyz"`) {
 			t.Errorf("Expected camelCase profileId, got: %s", jsonStr)
@@ -55,10 +54,9 @@ func TestBuildCacheRequest_JSON(t *testing.T) {
 
 	t.Run("Unmarshal accurately mapping arrays", func(t *testing.T) {
 		inputJSON := []byte(`{
-			"sessionId": "urn:llm:session:999",
 			"model": "gemini-2.5-pro",
-			"attachments": [
-				{"id": "urn:llm:attachment:2", "cacheId": "urn:llm:cache:123"}
+			"sources": [
+				{"id": "urn:llm:attachment:2", "dataSourceId": "urn:llm:cache:123"}
 			]
 		}`)
 
@@ -67,27 +65,23 @@ func TestBuildCacheRequest_JSON(t *testing.T) {
 			t.Fatalf("Failed to unmarshal: %v", err)
 		}
 
-		if req.SessionID.String() != "urn:llm:session:999" {
-			t.Errorf("Expected SessionID urn:llm:session:999, got %s", req.SessionID)
+		if len(req.Sources) != 1 {
+			t.Fatalf("Expected 1 attachment, got %d", len(req.Sources))
 		}
 
-		if len(req.Attachments) != 1 {
-			t.Fatalf("Expected 1 attachment, got %d", len(req.Attachments))
+		if req.Sources[0].DataSourceID.String() != "urn:llm:cache:123" {
+			t.Errorf("Expected DataSourceID urn:llm:cache:123, got %s", req.Sources[0].DataSourceID)
 		}
 
-		if req.Attachments[0].CacheID.String() != "urn:llm:cache:123" {
-			t.Errorf("Expected CacheID urn:llm:cache:123, got %s", req.Attachments[0].CacheID)
-		}
-
-		if req.Attachments[0].ProfileID != nil {
-			t.Errorf("Expected nil ProfileID, got %s", req.Attachments[0].ProfileID)
+		if req.Sources[0].ProfileID != nil {
+			t.Errorf("Expected nil ProfileID, got %s", req.Sources[0].ProfileID)
 		}
 	})
 }
 
 func TestBuildCacheResponse_JSON(t *testing.T) {
 	t.Run("Unmarshal handles both snake_case and camelCase", func(t *testing.T) {
-		snakeCaseJSON := []byte(`{"gemini_cache_id": "urn:llm:compiled-cache:123"}`)
+		snakeCaseJSON := []byte(`{"compiled_cache_id": "urn:llm:compiled-cache:123"}`)
 
 		var res builder.BuildCacheResponse
 		if err := json.Unmarshal(snakeCaseJSON, &res); err != nil {
@@ -110,7 +104,7 @@ func TestGenerateStreamRequest_JSON(t *testing.T) {
 				{ID: "msg-1", Role: "user", Content: "Hello AI", Timestamp: "2024-01-01T12:00:00Z"},
 			},
 			InlineAttachments: []builder.Attachment{
-				{ID: mustURN("urn:llm:attachment:1"), CacheID: mustURN("urn:llm:cache:456")},
+				{ID: mustURN("urn:llm:attachment:1"), DataSourceID: mustURN("urn:llm:cache:456")},
 			},
 		}
 
@@ -141,8 +135,8 @@ func TestGenerateStreamRequest_JSON(t *testing.T) {
 		if len(parsed.InlineAttachments) != 1 {
 			t.Fatalf("Expected 1 inline attachment, got %d", len(parsed.InlineAttachments))
 		}
-		if parsed.InlineAttachments[0].CacheID != original.InlineAttachments[0].CacheID {
-			t.Errorf("Inline Attachment CacheID mismatch: got %s", parsed.InlineAttachments[0].CacheID)
+		if parsed.InlineAttachments[0].DataSourceID != original.InlineAttachments[0].DataSourceID {
+			t.Errorf("Inline Attachment DataSourceID mismatch: got %s", parsed.InlineAttachments[0].DataSourceID)
 		}
 	})
 }

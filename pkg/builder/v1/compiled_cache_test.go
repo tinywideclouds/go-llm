@@ -19,15 +19,15 @@ func TestCompiledCache_JSONSerialization(t *testing.T) {
 		Provider:  "gemini",
 		CreatedAt: fixedTime,
 		ExpiresAt: fixedTime.Add(time.Hour),
-		AttachmentsUsed: []builder.Attachment{
+		Sources: []builder.Attachment{
 			{
-				ID:        mustURN("urn:llm:attachment:1"),
-				CacheID:   mustURN("urn:llm:cache:1"),
-				ProfileID: urnPtr("urn:llm:profile:xyz"),
+				ID:           mustURN("urn:llm:attachment:1"),
+				DataSourceID: mustURN("urn:llm:cache:1"),
+				ProfileID:    urnPtr("urn:llm:profile:xyz"),
 			},
 			{
-				ID:      mustURN("urn:llm:attachment:2"),
-				CacheID: mustURN("urn:llm:cache:2"),
+				ID:           mustURN("urn:llm:attachment:2"),
+				DataSourceID: mustURN("urn:llm:cache:2"),
 			},
 		},
 	}
@@ -39,8 +39,7 @@ func TestCompiledCache_JSONSerialization(t *testing.T) {
 	jsonStr := string(data)
 
 	// Verify Protobuf camelCase naming was enforced
-	assert.Contains(t, jsonStr, `"externalId":"cachedContents/gemini-789"`)
-	assert.Contains(t, jsonStr, `"attachmentsUsed":`)
+	assert.Contains(t, jsonStr, `"sources":`)
 	assert.Contains(t, jsonStr, `"profileId":"urn:llm:profile:xyz"`)
 
 	// 2. Unmarshal back to a new struct
@@ -54,13 +53,13 @@ func TestCompiledCache_JSONSerialization(t *testing.T) {
 	assert.True(t, original.CreatedAt.Equal(parsed.CreatedAt), "CreatedAt time mismatch")
 
 	// Verify Attachments Array
-	require.Len(t, parsed.AttachmentsUsed, 2)
+	require.Len(t, parsed.Sources, 2)
 
-	assert.Equal(t, mustURN("urn:llm:attachment:1"), parsed.AttachmentsUsed[0].ID)
-	assert.Equal(t, mustURN("urn:llm:cache:1"), parsed.AttachmentsUsed[0].CacheID)
-	assert.Equal(t, urnPtr("urn:llm:profile:xyz"), parsed.AttachmentsUsed[0].ProfileID)
+	assert.Equal(t, mustURN("urn:llm:attachment:1"), parsed.Sources[0].ID)
+	assert.Equal(t, mustURN("urn:llm:cache:1"), parsed.Sources[0].DataSourceID)
+	assert.Equal(t, urnPtr("urn:llm:profile:xyz"), parsed.Sources[0].ProfileID)
 
-	assert.Equal(t, mustURN("urn:llm:attachment:2"), parsed.AttachmentsUsed[1].ID)
-	assert.Equal(t, mustURN("urn:llm:cache:2"), parsed.AttachmentsUsed[1].CacheID)
-	assert.Nil(t, parsed.AttachmentsUsed[1].ProfileID)
+	assert.Equal(t, mustURN("urn:llm:attachment:2"), parsed.Sources[1].ID)
+	assert.Equal(t, mustURN("urn:llm:cache:2"), parsed.Sources[1].DataSourceID)
+	assert.Nil(t, parsed.Sources[1].ProfileID)
 }
