@@ -120,12 +120,15 @@ type Message struct {
 	Timestamp string `json:"timestamp"`
 }
 
+type ThinkingLevel string
+
 type GenerateStreamRequest struct {
-	SessionID         urn.URN      `json:"sessionId"`
-	Model             string       `json:"model"`
-	History           []Message    `json:"history"`
-	CompiledCacheID   *urn.URN     `json:"compiledCacheId,omitempty"`
-	InlineAttachments []Attachment `json:"inlineAttachments,omitempty"`
+	SessionID         urn.URN        `json:"sessionId"`
+	Model             string         `json:"model"`
+	History           []Message      `json:"history"`
+	ThinkingLevel     *ThinkingLevel `json:"thinkingLevel,omitempty"`
+	CompiledCacheID   *urn.URN       `json:"compiledCacheId,omitempty"`
+	InlineAttachments []Attachment   `json:"inlineAttachments,omitempty"`
 }
 
 func ToStreamProto(native *GenerateStreamRequest) *builderv1.GenerateStreamRequestPb {
