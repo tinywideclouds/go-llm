@@ -3,7 +3,7 @@ module github.com/tinywideclouds/go-llm
 go 1.26.0
 
 require (
-	github.com/tinywideclouds/gen-llm v0.0.11-beta
+	github.com/tinywideclouds/gen-llm v0.0.12-beta
 	github.com/tinywideclouds/go-platform v0.0.11
 	google.golang.org/protobuf v1.36.11
 )

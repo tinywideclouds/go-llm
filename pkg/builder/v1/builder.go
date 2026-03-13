@@ -242,6 +242,41 @@ func (pk *GenerateResponse) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// --- GENERATE REQUEST (NEW FACADE) ---
+
+type GenerateRequest struct {
+	Model        string `json:"model"`
+	SystemPrompt string `json:"systemPrompt"`
+	Prompt       string `json:"prompt"`
+}
+
+func GenerateRequestToProto(native *GenerateRequest) *builderv1.GenerateRequestPb {
+	if native == nil {
+		return nil
+	}
+	return &builderv1.GenerateRequestPb{
+		Model:        native.Model,
+		SystemPrompt: native.SystemPrompt,
+		Prompt:       native.Prompt,
+	}
+}
+
+func (pk GenerateRequest) MarshalJSON() ([]byte, error) {
+	return protojsonMarshalOptions.Marshal(GenerateRequestToProto(&pk))
+}
+
+func (pk *GenerateRequest) UnmarshalJSON(data []byte) error {
+	var protoPb builderv1.GenerateRequestPb
+	if err := protojsonUnmarshalOptions.Unmarshal(data, &protoPb); err != nil {
+		return err
+	}
+
+	pk.Model = protoPb.Model
+	pk.SystemPrompt = protoPb.SystemPrompt
+	pk.Prompt = protoPb.Prompt
+	return nil
+}
+
 // --- HELPERS ---
 
 func AttachmentsToProto(native []Attachment) []*builderv1.NetworkAttachmentPb {

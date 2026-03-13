@@ -181,4 +181,46 @@ func TestGenerateResponse_JSON(t *testing.T) {
 			t.Errorf("Expected PromptTokenCount 150, got %d", parsed.PromptTokenCount)
 		}
 	})
+
+}
+
+// NEW TEST FOR GENERATE REQUEST
+func TestGenerateRequest_JSON(t *testing.T) {
+	t.Run("Marshal to camelCase and Unmarshal snake_case seamlessly", func(t *testing.T) {
+		req := builder.GenerateRequest{
+			Model:        "gemini-3.1-pro",
+			SystemPrompt: "You are a summarizer.",
+			Prompt:       "Summarize this text.",
+		}
+
+		data, err := json.Marshal(req)
+		if err != nil {
+			t.Fatalf("Failed to marshal GenerateRequest: %v", err)
+		}
+
+		jsonStr := string(data)
+		// protojson with UseProtoNames: false emits lowerCamelCase
+		if !strings.Contains(jsonStr, `"systemPrompt":"You are a summarizer."`) {
+			t.Errorf("Expected camelCase output for SystemPrompt, got: %s", jsonStr)
+		}
+
+		// Simulate Go backend receiving snake_case from a raw client request
+		inputJSON := []byte(`{
+			"model": "gemini-3.1-pro",
+			"system_prompt": "You are a summarizer.",
+			"prompt": "Summarize this text."
+		}`)
+
+		var parsed builder.GenerateRequest
+		if err := json.Unmarshal(inputJSON, &parsed); err != nil {
+			t.Fatalf("Failed to unmarshal snake_case GenerateRequest: %v", err)
+		}
+
+		if parsed.SystemPrompt != "You are a summarizer." {
+			t.Errorf("Expected SystemPrompt 'You are a summarizer.', got '%s'", parsed.SystemPrompt)
+		}
+		if parsed.Prompt != "Summarize this text." {
+			t.Errorf("Expected Prompt 'Summarize this text.', got '%s'", parsed.Prompt)
+		}
+	})
 }
