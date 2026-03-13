@@ -204,6 +204,44 @@ func (pk *GenerateStreamRequest) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// --- GENERATE RESPONSE (NEW FACADE) ---
+
+type GenerateResponse struct {
+	Content             string `json:"content"`
+	FinishReason        string `json:"finishReason"`
+	PromptTokenCount    int32  `json:"promptTokenCount"`
+	CandidateTokenCount int32  `json:"candidateTokenCount"`
+}
+
+func GenerateResponseToProto(native *GenerateResponse) *builderv1.GenerateResponsePb {
+	if native == nil {
+		return nil
+	}
+	return &builderv1.GenerateResponsePb{
+		Content:             native.Content,
+		FinishReason:        native.FinishReason,
+		PromptTokenCount:    native.PromptTokenCount,
+		CandidateTokenCount: native.CandidateTokenCount,
+	}
+}
+
+func (pk GenerateResponse) MarshalJSON() ([]byte, error) {
+	return protojsonMarshalOptions.Marshal(GenerateResponseToProto(&pk))
+}
+
+func (pk *GenerateResponse) UnmarshalJSON(data []byte) error {
+	var protoPb builderv1.GenerateResponsePb
+	if err := protojsonUnmarshalOptions.Unmarshal(data, &protoPb); err != nil {
+		return err
+	}
+
+	pk.Content = protoPb.Content
+	pk.FinishReason = protoPb.FinishReason
+	pk.PromptTokenCount = protoPb.PromptTokenCount
+	pk.CandidateTokenCount = protoPb.CandidateTokenCount
+	return nil
+}
+
 // --- HELPERS ---
 
 func AttachmentsToProto(native []Attachment) []*builderv1.NetworkAttachmentPb {

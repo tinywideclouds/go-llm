@@ -140,3 +140,45 @@ func TestGenerateStreamRequest_JSON(t *testing.T) {
 		}
 	})
 }
+
+// NEW TEST FOR GENERATE RESPONSE
+func TestGenerateResponse_JSON(t *testing.T) {
+	t.Run("Marshal to camelCase and Unmarshal snake_case seamlessly", func(t *testing.T) {
+		res := builder.GenerateResponse{
+			Content:             "This is a structured digest.",
+			FinishReason:        "STOP",
+			PromptTokenCount:    150,
+			CandidateTokenCount: 50,
+		}
+
+		data, err := json.Marshal(res)
+		if err != nil {
+			t.Fatalf("Failed to marshal GenerateResponse: %v", err)
+		}
+
+		jsonStr := string(data)
+		if !strings.Contains(jsonStr, `"promptTokenCount":150`) {
+			t.Errorf("Expected camelCase output for PromptTokenCount, got: %s", jsonStr)
+		}
+
+		// Simulate Go backend sending snake_case via generic JSON
+		inputJSON := []byte(`{
+			"content": "This is a structured digest.",
+			"finish_reason": "STOP",
+			"prompt_token_count": 150,
+			"candidate_token_count": 50
+		}`)
+
+		var parsed builder.GenerateResponse
+		if err := json.Unmarshal(inputJSON, &parsed); err != nil {
+			t.Fatalf("Failed to unmarshal snake_case GenerateResponse: %v", err)
+		}
+
+		if parsed.Content != "This is a structured digest." {
+			t.Errorf("Expected Content 'This is a structured digest.', got '%s'", parsed.Content)
+		}
+		if parsed.PromptTokenCount != 150 {
+			t.Errorf("Expected PromptTokenCount 150, got %d", parsed.PromptTokenCount)
+		}
+	})
+}
